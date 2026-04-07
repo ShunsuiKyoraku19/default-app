@@ -11,6 +11,17 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
+app.post("/usuarios", (req, res) => {
+  const { nome, email, senha } = req.body;
+
+  console.log("Recebido:", nome, email, senha);
+
+  res.status(201).json({
+    mensagem: "Usuário criado com sucesso",
+    usuario: { nome, email }
+  });
+});
+
 app.get('/', (req: Request, res: Response) => {
   res.json({ message: 'Welcome to Default App API' });
 });
