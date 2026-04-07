@@ -22,7 +22,7 @@ export default function Register() {
     }
 
     try {
-      const res = await fetch("http://SEU_IP:3000/usuarios", {
+      const res = await fetch("http://192.168.1.3:3000/usuarios", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
