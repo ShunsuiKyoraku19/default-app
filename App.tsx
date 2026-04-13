@@ -1,5 +1,5 @@
-import Register from "./src/pages/login/login";
+import Login from "./src/pages/login/login";
 
 export default function App() {
-  return <Register />;
+  return <Login />;
 }
