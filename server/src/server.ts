@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
+import path from 'node:path';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,19 +12,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
-app.post("/usuarios", (req, res) => {
-  const { nome, email, senha } = req.body;
-
-  console.log("Recebido:", nome, email, senha);
-
-  res.status(201).json({
-    mensagem: "Usuário criado com sucesso",
-    usuario: { nome, email }
-  });
-});
-
 app.get('/', (req: Request, res: Response) => {
-  res.json({ message: 'Welcome to Default App API' });
+    res.sendFile(path.join(__dirname, "src", "login.tsx"));
 });
 
 app.get('/health', (req: Request, res: Response) => {
