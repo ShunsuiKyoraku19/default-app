@@ -5,7 +5,7 @@ Aplicativo mobile de **marketplace automotivo** (oficinas, agendamentos e notíc
 ## Tecnologias
 
 - **Frontend:** Expo, React Native, TypeScript, expo-sqlite, AsyncStorage, React Navigation, expo-image-picker
-- **Backend (opcional):** Node.js, Express, Multer (upload PNG/JPG)
+- **Backend:** Node.js, Express, Multer (upload PNG/JPG)
 
 ## Estrutura de pastas
 
