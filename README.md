@@ -31,14 +31,6 @@ npx expo start
 
 Depois escaneie o QR code com o Expo Go (Android) ou a câmera (iOS).
 
-Usuários criados pela tela de **cadastro** entram como **cliente**.
-
-### Testar cadastro e login
-
-1. Abra o app → **Criar conta** → preencha os dados → modal **Cadastro realizado!** → **Entrar agora** leva ao login.
-2. Faça login com o novo email e senha (aba **Notícias** como cliente: só leitura).
-3. Faça logout em **Perfil** → **Sair**.
-
 ## Expo Go
 
 O frontend está em **Expo SDK 54** (compatível com o **Expo Go** atual do marketing place).
