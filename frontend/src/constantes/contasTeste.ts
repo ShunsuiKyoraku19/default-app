@@ -2,11 +2,11 @@
 export const CONTA_ADMIN = {
   email: 'admin@fluxcarr.com',
   senha: '123456',
-  tipo: 'administrador' as const,
+  tipo: 'superadmin' as const,
 };
 
 export const CONTA_CLIENTE_DEMO = {
   email: 'cliente@fluxcarr.com',
   senha: '123456',
-  tipo: 'cliente' as const,
+  tipo: 'consumidor' as const,
 };

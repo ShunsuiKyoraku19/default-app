@@ -6,16 +6,22 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   useWindowDimensions,
   View,
 } from 'react-native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import type { ComponentProps } from 'react';
+import type { ImageSourcePropType } from 'react-native';
 import { tema } from '../estilos/tema';
 import { useAutenticacao } from '../contexto/ContextoAutenticacao';
+import type { PilhaInicioParametros, RotasAbas } from '../navegacao/tiposNavegacao';
 
 const AZUL_FIGMA = '#1E6FD9';
 const imagemOleoDireita = require('../../assets/home-troca-oleo.png');
@@ -24,27 +30,35 @@ type NomeMci = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
 const CATEGORIAS: {
   rotulo: string;
-  icone: NomeMci;
+  icone?: NomeMci;
+  imagem?: ImageSourcePropType;
   vermelho?: boolean;
 }[] = [
-  { rotulo: 'MECÂNICA', icone: 'cog-outline' },
-  { rotulo: 'ÓLEO', icone: 'oil' },
-  { rotulo: 'ELÉTRICA', icone: 'lightning-bolt-outline' },
-  { rotulo: 'PNEUS', icone: 'tire' },
-  { rotulo: 'REVISÃO', icone: 'wrench-outline' },
-  { rotulo: 'LAVA\u2011JATO', icone: 'car-wash' },
-  { rotulo: 'GUINCHO', icone: 'tow-truck' },
-  { rotulo: 'S.O.S', icone: 'asterisk', vermelho: true },
+  { rotulo: 'MECÂNICA', imagem: require('../../assets/categoria-mecanica.png') },
+  { rotulo: 'ÓLEO', imagem: require('../../assets/categoria-oleo.png') },
+  { rotulo: 'ELÉTRICA', imagem: require('../../assets/categoria-eletrica.png') },
+  { rotulo: 'PNEUS', imagem: require('../../assets/Icon (3).png') },
+  { rotulo: 'REVISÃO', imagem: require('../../assets/Icon (7).png') },
+  { rotulo: 'LAVA\u2011JATO', imagem: require('../../assets/Icon (6).png') },
+  { rotulo: 'GUINCHO', imagem: require('../../assets/categoria-guincho.png') },
+  { rotulo: 'S.O.S', imagem: require('../../assets/categoria-sos.png'), vermelho: true },
 ];
 
-const OFICINAS = [
+const OFICINAS: {
+  nome: string;
+  nota: string;
+  servico: string;
+  tempo: string;
+  dist: string;
+  thumb: ImageSourcePropType;
+}[] = [
   {
     nome: 'Mecânica Seu Zé',
     nota: '4.8',
     servico: 'Mecânica Geral',
     tempo: '30-45 min',
     dist: '1.5 km',
-    img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBkGw2IC13sADQmq8Y2VmlrU-5ASsRhbaKeZRVCCNceVQaq0bwKnp4Y0G02r5N9rrStrNgE-N78XGRsDODQKT6vTQgwGHYutecJLj-0KeA9os9Gg_DxRHHEBFbvv3NlmisYnoc_D9nzwBH8AVwXj1umajI6b9WvOL03ta14JLP13Nlz9t6TtpTQDh7SzbETiXdeTqFzckr2XCv-MStvmT-cvJ7hbYqv3C50rzmz5E9CtMDqwlybLw3lNooqU2TB7nrJpAmdCyjxU4gt',
+    thumb: require('../../assets/images/oficina-seu-ze.jpg'),
   },
   {
     nome: 'Peças Premium',
@@ -52,18 +66,40 @@ const OFICINAS = [
     servico: 'Importados',
     tempo: '45-60 min',
     dist: '2.2 km',
-    img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDBw68Lih1pYUXw-yvdr3Ac2BU-H48NpYWDTphElYY4qS9EoGWZzmyyddlHMCZeOkqF9GtBic1mn6UhUfKggOIrDP4n9HwzSRrYp7pfOgS2xY4p3stUNCgw9Q18CLZ1sKVERfP9YWQJQhV-qOTReG_pPrjV9sgW6CsjVYFBdU9tjBzw9JYyrVamQMhDuUKPA5s-LnMTEBUCwnLCThPXxzuLoA24KSTDQdvPpYsZ9LmCVD0gdIgiEOaEDDzi6hZt8G8OS-sCmNSkqIfs',
+    thumb: require('../../assets/images/oficina-pecas-premium.jpg'),
   },
 ];
 
 const GRID_GAP = 15;
 const BOX_ALVO = 70;
 
+type NavInicio = NativeStackNavigationProp<PilhaInicioParametros>;
+
 export function TelaHome() {
+  const navigation = useNavigation<NavInicio>();
   const { usuario } = useAutenticacao();
+
+  function irParaDetalhesOficina(nome: string) {
+    const tabNav = navigation.getParent<BottomTabNavigationProp<RotasAbas>>();
+    if (tabNav != null) {
+      tabNav.navigate('Inicio', {
+        screen: 'DetalhesOficina',
+        params: { nome },
+      });
+      return;
+    }
+    navigation.navigate('DetalhesOficina', { nome });
+  }
   const alturaBarraAbas = useBottomTabBarHeight();
   const inicial = usuario?.nome?.charAt(0)?.toUpperCase() ?? '?';
   const { width: larguraTela } = useWindowDimensions();
+
+  const textoLocalizacao = useMemo(() => {
+    const cidade = usuario?.cidadeNome?.trim();
+    const uf = usuario?.ufSigla?.trim();
+    if (cidade && uf) return `${cidade}, ${uf}`;
+    return 'Ceilândia, Brasília';
+  }, [usuario?.cidadeNome, usuario?.ufSigla]);
 
   const { larguraGrid, tamanhoBox, iconeCat } = useMemo(() => {
     const margens = 40;
@@ -84,12 +120,13 @@ export function TelaHome() {
     <SafeAreaView style={estilos.safe} edges={['top']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingBottom: alturaBarraAbas + 14 }}
       >
         <View style={estilos.topo}>
           <View style={estilos.local}>
             <Ionicons name="location-sharp" size={18} color={AZUL_FIGMA} />
-            <Text style={estilos.localTexto}>Ceilândia, Brasília</Text>
+            <Text style={estilos.localTexto}>{textoLocalizacao}</Text>
             <Ionicons name="chevron-down" size={14} color={AZUL_FIGMA} />
           </View>
           <View style={estilos.avatar}>
@@ -117,11 +154,26 @@ export function TelaHome() {
                     c.vermelho && estilos.iconeBoxSos,
                   ]}
                 >
-                  <MaterialCommunityIcons
-                    name={c.icone}
-                    size={c.vermelho ? Math.min(28, iconeCat + 2) : iconeCat}
-                    color={c.vermelho ? '#E53935' : AZUL_FIGMA}
-                  />
+                  {c.imagem != null ? (
+                    <Image
+                      source={c.imagem}
+                      style={{
+                        width: Math.round(
+                          iconeCat * (c.rotulo === 'S.O.S' ? 1.05 : 1.2),
+                        ),
+                        height: Math.round(
+                          iconeCat * (c.rotulo === 'S.O.S' ? 1.05 : 1.2),
+                        ),
+                      }}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <MaterialCommunityIcons
+                      name={c.icone!}
+                      size={c.vermelho ? Math.min(28, iconeCat + 2) : iconeCat}
+                      color={c.vermelho ? '#E53935' : AZUL_FIGMA}
+                    />
+                  )}
                 </View>
                 <Text
                   style={[estilos.celulaTexto, c.vermelho && estilos.celulaTextoSos]}
@@ -162,8 +214,13 @@ export function TelaHome() {
         </View>
 
         {OFICINAS.map((o) => (
-          <View key={o.nome} style={estilos.cardOficina}>
-            <Image source={{ uri: o.img }} style={estilos.cardImg} resizeMode="cover" />
+          <TouchableOpacity
+            key={o.nome}
+            style={estilos.cardOficina}
+            activeOpacity={0.75}
+            onPress={() => irParaDetalhesOficina(o.nome)}
+          >
+            <Image source={o.thumb} style={estilos.cardImg} resizeMode="cover" />
             <View style={estilos.cardCorpo}>
               <Text style={estilos.cardNome} numberOfLines={1}>
                 {o.nome}
@@ -187,7 +244,7 @@ export function TelaHome() {
                 <Text style={estilos.info}>{o.dist}</Text>
               </View>
             </View>
-          </View>
+          </TouchableOpacity>
         ))}
       </ScrollView>
     </SafeAreaView>

@@ -99,11 +99,16 @@ function IconeMarcaFluxcarr() {
   );
 }
 
-export function CabecalhoLogo() {
+type CabecalhoLogoProps = {
+  /** Estilo Figma da tela inicial (não altera Login/Cadastro quando omitido). */
+  varianteEntrada?: boolean;
+};
+
+export function CabecalhoLogo({ varianteEntrada }: CabecalhoLogoProps) {
   return (
     <View style={estilosLogo.container}>
       <IconeMarcaFluxcarr />
-      <Text style={estilosLogo.marca}>FLUXCARR</Text>
+      <Text style={[estilosLogo.marca, varianteEntrada && estilosLogo.marcaEntradaFigma]}>FLUXCARR</Text>
     </View>
   );
 }
@@ -206,5 +211,13 @@ const estilosLogo = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1,
     color: tema.texto,
+  },
+  marcaEntradaFigma: {
+    fontFamily: 'Manrope',
+    fontSize: 24,
+    fontWeight: '700',
+    letterSpacing: 0,
+    lineHeight: 32,
+    color: '#1B1B1D',
   },
 });

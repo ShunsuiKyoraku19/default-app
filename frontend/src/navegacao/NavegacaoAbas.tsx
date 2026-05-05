@@ -1,28 +1,28 @@
-import React, { type ComponentProps } from 'react';
-import { StyleSheet } from 'react-native';
+import React from 'react';
+import { Image } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
 import { RotaNoticiasPorTipo } from './RotaNoticiasPorTipo';
+import type { RotasAbas } from './tiposNavegacao';
 import { tema } from '../estilos/tema';
 import { TelaAgendamentos } from '../telas/TelaAgendamentos';
 import { TelaBuscar } from '../telas/TelaBuscar';
-import { TelaHome } from '../telas/TelaHome';
+import { PilhaInicio } from './PilhaInicio';
 import { TelaPerfil } from '../telas/TelaPerfil';
 
-export type RotasAbas = {
-  Inicio: undefined;
-  Buscar: undefined;
-  Noticias: undefined;
-  Agendamentos: undefined;
-  Perfil: undefined;
-};
+export type { RotasAbas } from './tiposNavegacao';
 
-const corAbaAtivaFigma = '#1E6FD9';
-const corAbaInativaFigma = '#A0A0A0';
+const corAbaAtivaFigma = '#005AB3';
+const corAbaInativaFigma = '#94A3B8';
 
 const Abas = createBottomTabNavigator<RotasAbas>();
 
-type NomeIconeIonicons = NonNullable<ComponentProps<typeof Ionicons>['name']>;
+const iconesAba: Record<keyof RotasAbas, number> = {
+  Inicio: require('../../assets/icons/tab-inicio.png'),
+  Buscar: require('../../assets/icons/tab-busca.png'),
+  Noticias: require('../../assets/icons/tab-noticias.png'),
+  Agendamentos: require('../../assets/icons/tab-agendamentos.png'),
+  Perfil: require('../../assets/icons/tab-perfil.png'),
+};
 
 export function NavegacaoAbas() {
   return (
@@ -33,41 +33,53 @@ export function NavegacaoAbas() {
         tabBarInactiveTintColor: corAbaInativaFigma,
         tabBarHideOnKeyboard: true,
         tabBarStyle: {
-          backgroundColor: tema.fundoBranco,
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: 'rgba(0,0,0,0.06)',
-          borderTopLeftRadius: 20,
-          borderTopRightRadius: 20,
-          paddingTop: 8,
-          paddingBottom: 8,
-          minHeight: 64,
+          backgroundColor: 'rgba(255,255,255,0.92)',
+          borderTopWidth: 1,
+          borderTopColor: '#F1F5F9',
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          paddingTop: 13,
+          paddingBottom: 20,
+          minHeight: 76,
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.06,
-          shadowRadius: 8,
-          elevation: 6,
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.05,
+          shadowRadius: 10,
+          elevation: 8,
         },
         tabBarItemStyle: {
           justifyContent: 'center',
           alignItems: 'center',
-          paddingVertical: 6,
+          paddingVertical: 4,
         },
         tabBarIconStyle: { marginTop: 0 },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginBottom: 2 },
-        tabBarIcon: ({ color, focused }) => {
-          const mapa: Record<keyof RotasAbas, NomeIconeIonicons> = {
-            Inicio: focused ? 'home' : 'home-outline',
-            Buscar: 'search',
-            Noticias: focused ? 'newspaper' : 'newspaper-outline',
-            Agendamentos: focused ? 'calendar' : 'calendar-outline',
-            Perfil: focused ? 'person' : 'person-outline',
-          };
-          const nome = mapa[route.name as keyof RotasAbas];
-          return <Ionicons name={nome} size={22} color={color} />;
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '500',
+          marginBottom: 2,
+          letterSpacing: 0.28,
+        },
+        tabBarIcon: ({ focused }) => {
+          const nomeRota = route.name as keyof RotasAbas;
+          const tint =
+            nomeRota === 'Inicio'
+              ? focused
+                ? undefined
+                : corAbaInativaFigma
+              : focused
+                ? corAbaAtivaFigma
+                : corAbaInativaFigma;
+          return (
+            <Image
+              source={iconesAba[nomeRota]}
+              style={{ width: 22, height: 22, tintColor: tint }}
+              resizeMode="contain"
+            />
+          );
         },
       })}
     >
-      <Abas.Screen name="Inicio" component={TelaHome} options={{ title: 'Início' }} />
+      <Abas.Screen name="Inicio" component={PilhaInicio} options={{ title: 'Início' }} />
       <Abas.Screen name="Buscar" component={TelaBuscar} options={{ title: 'Busca' }} />
       <Abas.Screen name="Noticias" component={RotaNoticiasPorTipo} options={{ title: 'Notícias' }} />
       <Abas.Screen name="Agendamentos" component={TelaAgendamentos} />
