@@ -4,12 +4,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BotaoPrimario } from '../componentes/BotaoPrimario';
 import { useAutenticacao } from '../contexto/ContextoAutenticacao';
 import { tema } from '../estilos/tema';
+import { perfilLegivel } from '../tipos/usuario';
 
 export function TelaPerfil() {
   const { usuario, sair } = useAutenticacao();
 
-  const tipoLegivel =
-    usuario?.tipo === 'administrador' ? 'Administrador' : 'Cliente';
+  const tipoLegivel = perfilLegivel(usuario?.tipo);
 
   return (
     <SafeAreaView style={estilos.safe}>

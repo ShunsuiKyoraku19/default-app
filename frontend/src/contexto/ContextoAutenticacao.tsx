@@ -6,7 +6,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import type { SessaoUsuario, TipoUsuario } from '../tipos/usuario';
+import { normalizarTipoUsuario, type SessaoUsuario } from '../tipos/usuario';
 import { autenticar } from '../servicos/usuarioServico';
 import { carregarSessao, limparSessao, salvarSessao } from '../servicos/sessaoServico';
 
@@ -22,12 +22,13 @@ const ContextoAutenticacao = createContext<ContextoAutenticacaoTipo | undefined>
 );
 
 function normalizarSessao(s: SessaoUsuario): SessaoUsuario {
-  const tipoNorm = String(s.tipo).trim().toLowerCase();
-  const tipo: TipoUsuario = tipoNorm === 'administrador' ? 'administrador' : 'cliente';
+  const tipo = normalizarTipoUsuario(String(s.tipo));
   return {
     ...s,
     id: Number(s.id),
     tipo,
+    cidadeNome: s.cidadeNome ?? null,
+    ufSigla: s.ufSigla ?? null,
   };
 }
 

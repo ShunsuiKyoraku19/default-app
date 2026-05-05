@@ -9,6 +9,11 @@ function contagem(row: { total: number | bigint } | null): number {
   return Number(row.total);
 }
 
+async function colunaExiste(banco: SQLiteDatabase, tabela: string, nome: string): Promise<boolean> {
+  const linhas = await banco.getAllAsync<{ name: string }>(`PRAGMA table_info(${tabela})`);
+  return linhas.some((c) => c.name === nome);
+}
+
 export async function obterBanco(): Promise<SQLiteDatabase> {
   if (!instancia) {
     instancia = await openDatabaseAsync('fluxcarr.db');
@@ -33,9 +38,53 @@ export async function inicializarBanco(): Promise<void> {
       nome TEXT NOT NULL,
       email TEXT NOT NULL UNIQUE,
       senha TEXT NOT NULL,
-      tipo TEXT NOT NULL DEFAULT 'cliente'
+      tipo TEXT NOT NULL DEFAULT 'consumidor'
     );
   `);
+
+  if (!(await colunaExiste(banco, 'usuarios', 'uf_id'))) {
+    await banco.execAsync('ALTER TABLE usuarios ADD COLUMN uf_id INTEGER');
+  }
+  if (!(await colunaExiste(banco, 'usuarios', 'cidade_id'))) {
+    await banco.execAsync('ALTER TABLE usuarios ADD COLUMN cidade_id INTEGER');
+  }
+
+  await banco.execAsync(`
+    CREATE TABLE IF NOT EXISTS ufs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome TEXT NOT NULL,
+      sigla TEXT NOT NULL UNIQUE
+    );
+  `);
+
+  await banco.execAsync(`
+    CREATE TABLE IF NOT EXISTS cidades (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome TEXT NOT NULL,
+      uf_id INTEGER NOT NULL
+    );
+  `);
+
+  await banco.runAsync(`UPDATE usuarios SET tipo = 'consumidor' WHERE lower(tipo) = 'cliente'`);
+  await banco.runAsync(`UPDATE usuarios SET tipo = 'superadmin' WHERE lower(tipo) = 'administrador'`);
+
+  const qtdUfs = await banco.getFirstAsync<{ total: number | bigint }>('SELECT COUNT(*) as total FROM ufs');
+  if (contagem(qtdUfs) === 0) {
+    await banco.runAsync(
+      `INSERT INTO ufs (id, nome, sigla) VALUES (1, 'Distrito Federal', 'DF')`
+    );
+    await banco.runAsync(
+      `INSERT INTO cidades (id, nome, uf_id) VALUES
+        (1, 'Ceilândia', 1),
+        (2, 'Brasília', 1),
+        (3, 'Taguatinga', 1),
+        (4, 'Samambaia', 1)`
+    );
+  }
+
+  await banco.runAsync(
+    `UPDATE usuarios SET uf_id = 1, cidade_id = 1 WHERE uf_id IS NULL OR cidade_id IS NULL`
+  );
 
   await banco.execAsync(`
     CREATE TABLE IF NOT EXISTS noticias (
@@ -56,7 +105,7 @@ export async function inicializarBanco(): Promise<void> {
 
   if (contagem(admin) === 0) {
     await banco.runAsync(
-      'INSERT INTO usuarios (nome, email, senha, tipo) VALUES (?, ?, ?, ?)',
+      'INSERT INTO usuarios (nome, email, senha, tipo, uf_id, cidade_id) VALUES (?, ?, ?, ?, 1, 1)',
       ['Administrador', CONTA_ADMIN.email, CONTA_ADMIN.senha, CONTA_ADMIN.tipo]
     );
   }
@@ -68,7 +117,7 @@ export async function inicializarBanco(): Promise<void> {
 
   if (contagem(clienteDemo) === 0) {
     await banco.runAsync(
-      'INSERT INTO usuarios (nome, email, senha, tipo) VALUES (?, ?, ?, ?)',
+      'INSERT INTO usuarios (nome, email, senha, tipo, uf_id, cidade_id) VALUES (?, ?, ?, ?, 1, 1)',
       ['Cliente demonstração', CONTA_CLIENTE_DEMO.email, CONTA_CLIENTE_DEMO.senha, CONTA_CLIENTE_DEMO.tipo]
     );
   }
