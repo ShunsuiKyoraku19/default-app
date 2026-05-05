@@ -9,3 +9,5 @@ backend/.env
 .env.*
 !.env.example
 backend/uploads/
+Backend/uploads/
+Backend/data/

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -19,11 +19,29 @@ import { CampoTexto } from '../componentes/CampoTexto';
 import { CabecalhoLogo } from '../componentes/CabecalhoFluxo';
 import { tema } from '../estilos/tema';
 import type { PilhaAutenticacaoParametros } from '../navegacao/tiposNavegacao';
+import { SeletorSimples, type OpcaoSeletor } from '../componentes/SeletorSimples';
+import type { CidadeLinha, UfLinha } from '../servicos/localizacaoServico';
+import { listarCidadesPorUf, listarUfs } from '../servicos/localizacaoServico';
 import { cadastrarCliente, emailJaExiste } from '../servicos/usuarioServico';
+import type { TipoUsuarioCadastro } from '../tipos/usuario';
 
 type Props = NativeStackScreenProps<PilhaAutenticacaoParametros, 'Cadastro'>;
 
 const estiloInputAuth = { borderRadius: 10 };
+
+const ID_TIPO_CLIENTE = 201;
+const ID_TIPO_PRESTADOR = 202;
+
+const OPCOES_TIPO: OpcaoSeletor[] = [
+  { id: ID_TIPO_CLIENTE, label: 'Cliente' },
+  { id: ID_TIPO_PRESTADOR, label: 'Prestador de serviço' },
+];
+
+function tipoPorIdSeletor(id: number): TipoUsuarioCadastro | null {
+  if (id === ID_TIPO_CLIENTE) return 'consumidor';
+  if (id === ID_TIPO_PRESTADOR) return 'prestador';
+  return null;
+}
 
 export function TelaCadastro({ navigation }: Props) {
   const [nome, setNome] = useState('');
@@ -32,10 +50,53 @@ export function TelaCadastro({ navigation }: Props) {
   const [confirmar, setConfirmar] = useState('');
   const [modalOk, setModalOk] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [ufs, setUfs] = useState<UfLinha[]>([]);
+  const [cidades, setCidades] = useState<CidadeLinha[]>([]);
+  const [ufId, setUfId] = useState<number | null>(null);
+  const [cidadeId, setCidadeId] = useState<number | null>(null);
+  const [tipoSeletorId, setTipoSeletorId] = useState<number>(ID_TIPO_CLIENTE);
+
+  useEffect(() => {
+    void listarUfs().then(setUfs);
+  }, []);
+
+  useEffect(() => {
+    if (ufId == null) {
+      setCidades([]);
+      setCidadeId(null);
+      return;
+    }
+    void listarCidadesPorUf(ufId).then((lista) => {
+      setCidades(lista);
+      setCidadeId((atual) => {
+        if (atual != null && lista.some((c) => c.id === atual)) return atual;
+        return null;
+      });
+    });
+  }, [ufId]);
+
+  const opcoesUf = useMemo<OpcaoSeletor[]>(
+    () => ufs.map((u) => ({ id: u.id, label: `${u.sigla} — ${u.nome}` })),
+    [ufs]
+  );
+
+  const opcoesCidade = useMemo<OpcaoSeletor[]>(
+    () => cidades.map((c) => ({ id: c.id, label: c.nome })),
+    [cidades]
+  );
 
   async function criarConta() {
     if (!nome.trim() || !email.trim() || !senha || !confirmar) {
       Alert.alert('Atenção', 'Preencha todos os campos.');
+      return;
+    }
+    if (ufId == null || cidadeId == null) {
+      Alert.alert('Atenção', 'Selecione a UF e a cidade.');
+      return;
+    }
+    const tipoUsuario = tipoPorIdSeletor(tipoSeletorId);
+    if (tipoUsuario == null) {
+      Alert.alert('Atenção', 'Selecione o tipo de usuário.');
       return;
     }
     if (senha !== confirmar) {
@@ -48,7 +109,11 @@ export function TelaCadastro({ navigation }: Props) {
     }
     setSalvando(true);
     try {
-      await cadastrarCliente(nome, email, senha);
+      await cadastrarCliente(nome, email, senha, {
+        ufId,
+        cidadeId,
+        tipoUsuario,
+      });
       setModalOk(true);
     } catch {
       Alert.alert('Erro', 'Não foi possível salvar. Tente novamente.');
@@ -89,6 +154,32 @@ export function TelaCadastro({ navigation }: Props) {
               <Text style={estilos.titulo}>Cadastrar</Text>
               <Text style={estilos.sub}>Crie Sua Conta Agora</Text>
             </View>
+
+            <SeletorSimples
+              rotulo="UF"
+              placeholder="Selecione a UF"
+              opcoes={opcoesUf}
+              valorSelecionadoId={ufId}
+              onChange={(id) => {
+                setUfId(id);
+                setCidadeId(null);
+              }}
+            />
+            <SeletorSimples
+              rotulo="Cidade"
+              placeholder={ufId == null ? 'Selecione primeiro a UF' : 'Selecione a cidade'}
+              opcoes={opcoesCidade}
+              valorSelecionadoId={cidadeId}
+              onChange={setCidadeId}
+              desabilitado={ufId == null || opcoesCidade.length === 0}
+            />
+            <SeletorSimples
+              rotulo="Tipo de usuário"
+              placeholder="Selecione o perfil"
+              opcoes={OPCOES_TIPO}
+              valorSelecionadoId={tipoSeletorId}
+              onChange={setTipoSeletorId}
+            />
 
             <CampoTexto
               rotulo="Seu nome completo"

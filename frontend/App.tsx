@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
+import * as Font from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { inicializarBanco } from './src/banco/inicializarBanco';
@@ -16,6 +17,13 @@ export default function App() {
     void (async () => {
       try {
         await inicializarBanco();
+        try {
+          await Font.loadAsync({
+            Manrope: require('./assets/fonts/Manrope-Variable.ttf'),
+          });
+        } catch (e) {
+          console.warn('[FLUXCARR] Fonte Manrope não carregada:', e);
+        }
         setErroBanco(null);
         setBancoOk(true);
       } catch (e) {

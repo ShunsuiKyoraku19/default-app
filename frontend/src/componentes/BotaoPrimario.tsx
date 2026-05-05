@@ -4,6 +4,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  View,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
@@ -16,6 +17,10 @@ type Props = {
   desabilitado?: boolean;
   carregando?: boolean;
   estiloExtra?: StyleProp<ViewStyle>;
+  /** Gradiente horizontal #005AB3 → #0073E0 (apenas variante preenchido). */
+  gradiente?: boolean;
+  /** Cor do texto na variante borda (opcional). */
+  corTextoBorda?: string;
 };
 
 export function BotaoPrimario({
@@ -25,13 +30,17 @@ export function BotaoPrimario({
   desabilitado,
   carregando,
   estiloExtra,
+  gradiente,
+  corTextoBorda,
 }: Props) {
   const ehBorda = variante === 'borda';
+  const comGradiente = Boolean(gradiente) && !ehBorda;
   return (
     <TouchableOpacity
       style={[
         estilos.base,
-        ehBorda ? estilos.borda : estilos.preenchido,
+        comGradiente && estilos.baseGradiente,
+        ehBorda ? estilos.borda : !comGradiente && estilos.preenchido,
         (desabilitado || carregando) && estilos.desabilitado,
         estiloExtra,
       ]}
@@ -41,8 +50,24 @@ export function BotaoPrimario({
     >
       {carregando ? (
         <ActivityIndicator color={ehBorda ? tema.azulPrimario : '#fff'} />
+      ) : comGradiente ? (
+        <View style={estilos.gradienteWrap}>
+          <View style={estilos.gradienteFaixas}>
+            <View style={[estilos.gradienteMetade, { backgroundColor: '#005AB3' }]} />
+            <View style={[estilos.gradienteMetade, { backgroundColor: '#0073E0' }]} />
+          </View>
+          <Text style={[estilos.texto, estilos.textoSobreGradiente]}>{titulo}</Text>
+        </View>
       ) : (
-        <Text style={[estilos.texto, ehBorda && estilos.textoBorda]}>{titulo}</Text>
+        <Text
+          style={[
+            estilos.texto,
+            ehBorda && estilos.textoBorda,
+            ehBorda && corTextoBorda != null && { color: corTextoBorda },
+          ]}
+        >
+          {titulo}
+        </Text>
       )}
     </TouchableOpacity>
   );
@@ -54,6 +79,32 @@ const estilos = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  baseGradiente: {
+    paddingVertical: 0,
+    backgroundColor: 'transparent',
+    minHeight: 56,
+    borderRadius: 8,
+  },
+  gradienteWrap: {
+    width: '100%',
+    minHeight: 56,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  gradienteFaixas: {
+    ...StyleSheet.absoluteFillObject,
+    flexDirection: 'row',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  gradienteMetade: {
+    flex: 1,
+  },
+  textoSobreGradiente: {
+    zIndex: 1,
   },
   preenchido: {
     backgroundColor: tema.azulPrimario,

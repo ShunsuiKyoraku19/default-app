@@ -1,15 +1,27 @@
 import { obterBanco } from '../banco/inicializarBanco';
-import type { SessaoUsuario, TipoUsuario } from '../tipos/usuario';
+import {
+  normalizarTipoUsuario,
+  type SessaoUsuario,
+  type TipoUsuarioCadastro,
+} from '../tipos/usuario';
 
 export async function cadastrarCliente(
   nome: string,
   email: string,
-  senha: string
+  senha: string,
+  opcoes: { ufId: number; cidadeId: number; tipoUsuario: TipoUsuarioCadastro }
 ): Promise<void> {
   const banco = await obterBanco();
   await banco.runAsync(
-    'INSERT INTO usuarios (nome, email, senha, tipo) VALUES (?, ?, ?, ?)',
-    [nome.trim(), email.trim().toLowerCase(), senha, 'cliente']
+    'INSERT INTO usuarios (nome, email, senha, tipo, uf_id, cidade_id) VALUES (?, ?, ?, ?, ?, ?)',
+    [
+      nome.trim(),
+      email.trim().toLowerCase(),
+      senha,
+      opcoes.tipoUsuario,
+      opcoes.ufId,
+      opcoes.cidadeId,
+    ]
   );
 }
 
@@ -32,18 +44,27 @@ export async function autenticar(
     nome: string;
     email: string;
     tipo: string;
+    cidade_nome: string | null;
+    uf_sigla: string | null;
   }>(
-    'SELECT id, nome, email, tipo FROM usuarios WHERE lower(email) = ? AND senha = ?',
+    `SELECT u.id, u.nome, u.email, u.tipo,
+            c.nome AS cidade_nome,
+            f.sigla AS uf_sigla
+     FROM usuarios u
+     LEFT JOIN cidades c ON c.id = u.cidade_id
+     LEFT JOIN ufs f ON f.id = u.uf_id
+     WHERE lower(u.email) = ? AND u.senha = ?`,
     [email.trim().toLowerCase(), senha]
   );
   if (!usuario) return null;
-  const tipoNorm = String(usuario.tipo).trim().toLowerCase();
-  const tipo: TipoUsuario =
-    tipoNorm === 'administrador' ? 'administrador' : 'cliente';
+  const tipo = normalizarTipoUsuario(usuario.tipo);
   return {
     id: Number(usuario.id),
     nome: usuario.nome,
     email: usuario.email,
     tipo,
+    cidadeNome: usuario.cidade_nome,
+    ufSigla: usuario.uf_sigla,
   };
 }
+
