@@ -1,10 +1,11 @@
 import React from 'react';
 import { Image } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RotaNoticiasPorTipo } from './RotaNoticiasPorTipo';
 import type { RotasAbas } from './tiposNavegacao';
 import { tema } from '../estilos/tema';
-import { TelaAgendamentos } from '../telas/TelaAgendamentos';
+import { PilhaAgendamentos } from './PilhaAgendamentos';
 import { TelaBuscar } from '../telas/TelaBuscar';
 import { PilhaInicio } from './PilhaInicio';
 import { TelaPerfil } from '../telas/TelaPerfil';
@@ -25,6 +26,9 @@ const iconesAba: Record<keyof RotasAbas, number> = {
 };
 
 export function NavegacaoAbas() {
+  const insets = useSafeAreaInsets();
+  const paddingFundoAba = 20 + insets.bottom;
+
   return (
     <Abas.Navigator
       screenOptions={({ route }) => ({
@@ -39,8 +43,8 @@ export function NavegacaoAbas() {
           borderTopLeftRadius: 24,
           borderTopRightRadius: 24,
           paddingTop: 13,
-          paddingBottom: 20,
-          minHeight: 76,
+          paddingBottom: paddingFundoAba,
+          minHeight: 56 + paddingFundoAba,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -4 },
           shadowOpacity: 0.05,
@@ -82,7 +86,7 @@ export function NavegacaoAbas() {
       <Abas.Screen name="Inicio" component={PilhaInicio} options={{ title: 'Início' }} />
       <Abas.Screen name="Buscar" component={TelaBuscar} options={{ title: 'Busca' }} />
       <Abas.Screen name="Noticias" component={RotaNoticiasPorTipo} options={{ title: 'Notícias' }} />
-      <Abas.Screen name="Agendamentos" component={TelaAgendamentos} />
+      <Abas.Screen name="Agendamentos" component={PilhaAgendamentos} options={{ title: 'Agendamentos' }} />
       <Abas.Screen name="Perfil" component={TelaPerfil} />
     </Abas.Navigator>
   );

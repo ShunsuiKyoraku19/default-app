@@ -8,10 +8,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { CabecalhoFluxo } from '../componentes/CabecalhoFluxo';
 import { FILTROS_CLIENTE } from '../constantes/categoriasNoticia';
+import { useAutenticacao } from '../contexto/ContextoAutenticacao';
 import { tema } from '../estilos/tema';
 import type { PilhaNoticiasClienteParametros } from '../navegacao/tiposNavegacao';
 import { listarNoticias } from '../servicos/noticiaServico';
@@ -27,6 +29,9 @@ function corCategoria(cat: string): string {
 }
 
 export function TelaNoticiasCliente({ navigation }: Props) {
+  const { usuario } = useAutenticacao();
+  const inicial = usuario?.nome?.charAt(0)?.toUpperCase() ?? '?';
+  const alturaBarraAbas = useBottomTabBarHeight();
   const [lista, setLista] = useState<Noticia[]>([]);
   const [filtro, setFiltro] = useState('Todas');
 
@@ -68,18 +73,25 @@ export function TelaNoticiasCliente({ navigation }: Props) {
   );
 
   return (
-    <View style={estilos.safe}>
-      <CabecalhoFluxo titulo="Notícias" mostrarVoltar={false} mostrarAvatar />
+    <SafeAreaView style={estilos.safe} edges={['top']}>
+      <View style={estilos.header}>
+        <View style={estilos.headerEspaco} />
+        <Text style={estilos.tituloHeader} numberOfLines={1}>
+          Notícias
+        </Text>
+        <View style={estilos.avatar}>
+          <Text style={estilos.avatarLetra}>{inicial}</Text>
+        </View>
+      </View>
 
       <FlatList
         data={filtrada}
         keyExtractor={(item) => String(item.id)}
-        ListHeaderComponent={
-          <View>
-            {cabecalhoFiltros}
-          </View>
-        }
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
+        ListHeaderComponent={<View style={estilos.filtrosWrap}>{cabecalhoFiltros}</View>}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingBottom: alturaBarraAbas + 28,
+        }}
         ListEmptyComponent={
           <Text style={estilos.vazio}>Nenhuma notícia encontrada para este filtro.</Text>
         }
@@ -124,12 +136,41 @@ export function TelaNoticiasCliente({ navigation }: Props) {
           );
         }}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const estilos = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: tema.fundo },
+  safe: { flex: 1, backgroundColor: tema.fundoBranco },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    minHeight: 52,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0,0,0,0.06)',
+    backgroundColor: tema.fundoBranco,
+  },
+  headerEspaco: { width: 36 },
+  tituloHeader: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 17,
+    fontWeight: '700',
+    color: tema.texto,
+    marginHorizontal: 4,
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: tema.azulClaro,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarLetra: { fontWeight: '700', color: tema.azulEscuro, fontSize: 14 },
+  filtrosWrap: { marginTop: 12, marginBottom: 4 },
   filtros: { paddingVertical: 8, paddingRight: 16 },
   chip: {
     paddingHorizontal: 18,

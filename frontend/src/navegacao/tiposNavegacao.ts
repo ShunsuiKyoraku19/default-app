@@ -1,5 +1,6 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { CategoriaLoja } from '../tipos/loja';
 
 export type PilhaAutenticacaoParametros = {
   BoasVindas: undefined;
@@ -9,16 +10,23 @@ export type PilhaAutenticacaoParametros = {
 
 export type PilhaInicioParametros = {
   Home: undefined;
-  DetalhesOficina: { nome: string };
-  SelecionarServicos: { nome: string };
-  ResumoServico: { nome: string };
+  AjudaSos: undefined;
+  ListaLojasCategoria: { categoria: CategoriaLoja };
+  DetalhesOficina: { lojaId: string };
+  SelecionarServicos: { lojaId: string };
+  ResumoServico: { lojaId: string; idsServicos: string[]; dataIso: string; horario: string };
+};
+
+export type PilhaAgendamentosParametros = {
+  ListaAgendamentos: undefined;
+  DetalheAgendamento: { id: string };
 };
 
 export type RotasAbas = {
   Inicio: NavigatorScreenParams<PilhaInicioParametros> | undefined;
   Buscar: undefined;
   Noticias: undefined;
-  Agendamentos: undefined;
+  Agendamentos: NavigatorScreenParams<PilhaAgendamentosParametros> | undefined;
   Perfil: undefined;
 };
 

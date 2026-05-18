@@ -1,7 +1,3 @@
-/**
- * API FLUXCARR — Express + TypeScript + SQLite + Drizzle
- * Mantém POST /api/upload (multer) e expõe CRUD de UF, Cidade e Usuário.
- */
 import cors from 'cors';
 import express, { type Request } from 'express';
 import type { FileFilterCallback } from 'multer';
@@ -75,6 +71,6 @@ app.get('/', (_req, res) => {
 });
 
 app.listen(PORTA, '0.0.0.0', () => {
-  // eslint-disable-next-line no-console
+  
   console.log(`FLUXCARR backend (TS+Drizzle) em http://0.0.0.0:${PORTA}`);
 });

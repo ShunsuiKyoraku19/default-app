@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
+  BackHandler,
   Modal,
   Pressable,
   ScrollView,
@@ -9,40 +10,139 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useBottomTabBarHeight, type BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { RESUMO_VALORES_FIXOS } from '../constantes/servicosAgendamento';
+import { obterLojaPorId } from '../constantes/lojasFicticias';
+import { calcularTaxasResumo, formatBRL } from '../constantes/servicosAgendamento';
 import { useAutenticacao } from '../contexto/ContextoAutenticacao';
+import { salvarAgendamento } from '../servicos/agendamentosArmazenamento';
 import { tema } from '../estilos/tema';
-import type { PilhaInicioParametros } from '../navegacao/tiposNavegacao';
+import type { PilhaInicioParametros, RotasAbas } from '../navegacao/tiposNavegacao';
+import type { AgendamentoSalvo } from '../tipos/agendamento';
 
 type Props = NativeStackScreenProps<PilhaInicioParametros, 'ResumoServico'>;
 
 const CINZA_ETAPA_FUNDO = '#E4E2E4';
 const TRILHA_ATIVA_FUNDO = 'rgba(0, 90, 179, 0.20)';
-const VERMELHO = '#C62828';
 
-export function TelaResumoServico({ route }: Props) {
-  const { nome: nomeFluxo } = route.params;
+function formatarDataResumo(dataIso: string): string {
+  const [y, m, d] = dataIso.split('-').map(Number);
+  if (!y || !m || !d) return dataIso;
+  const dt = new Date(y, m - 1, d, 12, 0, 0, 0);
+  const base = dt.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+  return base.charAt(0).toUpperCase() + base.slice(1);
+}
+
+export function TelaResumoServico({ navigation, route }: Props) {
+  const { lojaId, idsServicos, dataIso, horario } = route.params;
   const { usuario } = useAutenticacao();
   const inicial = usuario?.nome?.charAt(0)?.toUpperCase() ?? '?';
   const alturaBarraAbas = useBottomTabBarHeight();
 
   const [modalVisivel, setModalVisivel] = useState(false);
   const [fluxoFinalizado, setFluxoFinalizado] = useState(false);
+  const jaSalvou = useRef(false);
 
-  const v = RESUMO_VALORES_FIXOS;
+  const loja = useMemo(() => obterLojaPorId(lojaId), [lojaId]);
+  const nomeFluxo = loja?.nome ?? 'Oficina';
+
+  const servicosSelecionados = useMemo(() => {
+    const lista = loja?.servicosAgendamento ?? [];
+    return idsServicos
+      .map((id) => lista.find((s) => s.id === id))
+      .filter((s): s is NonNullable<typeof s> => s != null);
+  }, [loja, idsServicos]);
+
+  const subtotal = useMemo(
+    () => servicosSelecionados.reduce((acc, s) => acc + s.precoReais, 0),
+    [servicosSelecionados]
+  );
+  const taxas = useMemo(() => calcularTaxasResumo(subtotal), [subtotal]);
+  const dataLinha = formatarDataResumo(dataIso);
+  const horarioLinha = horario;
+
+  async function persistirAgendamento() {
+    if (jaSalvou.current || loja == null) return;
+    jaSalvou.current = true;
+    try {
+      const agora = new Date().toISOString();
+      const registro: AgendamentoSalvo = {
+        id: `ag-${Date.now()}`,
+        lojaId: loja.id,
+        nomeLoja: loja.nome,
+        enderecoLoja: loja.endereco,
+        servicos: servicosSelecionados.map((s) => ({
+          id: s.id,
+          titulo: s.titulo,
+          preco: s.preco,
+          precoReais: s.precoReais,
+        })),
+        valorServicosReais: subtotal,
+        maoObraReais: taxas.maoObra,
+        taxaAppReais: taxas.taxaApp,
+        valorTotalReais: taxas.total,
+        dataIso,
+        dataExibicao: dataLinha,
+        horario,
+        status: 'Agendado',
+        criadoEm: agora,
+      };
+      await salvarAgendamento(registro);
+    } catch {
+      jaSalvou.current = false;
+    }
+  }
+
+  function abrirConfirmacao() {
+    if (fluxoFinalizado) return;
+    void persistirAgendamento();
+    setModalVisivel(true);
+  }
+
+  const irParaMeusAgendamentos = useCallback(() => {
+    const tabNav = navigation.getParent<BottomTabNavigationProp<RotasAbas>>();
+    if (tabNav != null) {
+      tabNav.navigate('Agendamentos', { screen: 'ListaAgendamentos' });
+    }
+  }, [navigation]);
+
+  const aoVoltar = useCallback(() => {
+    if (fluxoFinalizado) {
+      irParaMeusAgendamentos();
+      return;
+    }
+    navigation.goBack();
+  }, [fluxoFinalizado, irParaMeusAgendamentos, navigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!fluxoFinalizado) return undefined;
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        irParaMeusAgendamentos();
+        return true;
+      });
+      return () => sub.remove();
+    }, [fluxoFinalizado, irParaMeusAgendamentos])
+  );
 
   return (
     <SafeAreaView style={estilos.safe} edges={['top']}>
       <View style={estilos.topo}>
-        <View style={estilos.local}>
-          <Ionicons name="location-sharp" size={18} color={tema.azulPrimario} />
-          <Text style={estilos.localTexto}>Ceilândia, Brasília</Text>
-          <Ionicons name="chevron-down" size={14} color={tema.azulPrimario} />
-        </View>
+        <Pressable
+          onPress={aoVoltar}
+          hitSlop={12}
+          style={estilos.btnVoltar}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar"
+        >
+          <Ionicons name="chevron-back" size={26} color={tema.azulPrimario} />
+        </Pressable>
+        <Text style={estilos.tituloHeader} numberOfLines={1}>
+          Resumo
+        </Text>
         <View style={estilos.avatar}>
           <Text style={estilos.avatarLetra}>{inicial}</Text>
         </View>
@@ -96,22 +196,33 @@ export function TelaResumoServico({ route }: Props) {
         <View style={estilos.card}>
           <Text style={estilos.cardTitulo}>Valor Total do Serviço</Text>
           <Text style={estilos.cardSubFluxo}>{nomeFluxo}</Text>
+
+          <Text style={estilos.secaoServ}>Serviços selecionados</Text>
+          {servicosSelecionados.map((s) => (
+            <View key={s.id} style={estilos.linhaServ}>
+              <Text style={estilos.nomeServ} numberOfLines={2}>
+                {s.titulo}
+              </Text>
+              <Text style={estilos.precoServ}>{s.preco}</Text>
+            </View>
+          ))}
+
           <View style={estilos.linhaValor}>
             <Text style={estilos.labelValor}>Serviço Total</Text>
-            <Text style={estilos.valor}>{v.servicoTotal}</Text>
+            <Text style={estilos.valor}>{formatBRL(subtotal)}</Text>
           </View>
           <View style={estilos.linhaValor}>
             <Text style={estilos.labelValor}>Mão de obra</Text>
-            <Text style={estilos.valor}>{v.maoObra}</Text>
+            <Text style={estilos.valor}>{formatBRL(taxas.maoObra)}</Text>
           </View>
           <View style={estilos.linhaValor}>
             <Text style={estilos.labelValor}>Taxa do App</Text>
-            <Text style={estilos.valor}>{v.taxaApp}</Text>
+            <Text style={estilos.valor}>{formatBRL(taxas.taxaApp)}</Text>
           </View>
           <View style={estilos.divisor} />
           <View style={estilos.linhaValor}>
             <Text style={estilos.totalLabel}>Valor Total</Text>
-            <Text style={estilos.totalValor}>{v.valorTotal}</Text>
+            <Text style={estilos.totalValor}>{formatBRL(taxas.total)}</Text>
           </View>
 
           <View style={estilos.infoBloco}>
@@ -122,34 +233,47 @@ export function TelaResumoServico({ route }: Props) {
                 color={tema.azulPrimario}
               />
               <View style={estilos.infoTextosCol}>
-                <Text style={estilos.infoPrincipal}>{v.dataLinha}</Text>
-                <Text style={estilos.infoSec}>{v.horarioLinha}</Text>
+                <Text style={estilos.infoPrincipal}>{dataLinha}</Text>
+                <Text style={estilos.infoSec}>{horarioLinha}</Text>
               </View>
             </View>
             <View style={estilos.infoLinha}>
               <Ionicons name="location-outline" size={18} color={tema.azulPrimario} />
               <View style={estilos.infoTextosCol}>
-                <Text style={estilos.infoPrincipal}>{v.nomeOficinaResumo}</Text>
-                <Text style={estilos.infoSec}>{v.enderecoResumo}</Text>
+                <Text style={estilos.infoPrincipal} numberOfLines={2}>
+                  {nomeFluxo}
+                </Text>
+                <Text style={estilos.infoSec} numberOfLines={3}>
+                  {loja?.endereco ?? '—'}
+                </Text>
               </View>
             </View>
           </View>
 
           <TouchableOpacity
-            style={fluxoFinalizado ? estilos.botaoVermelho : estilos.botaoAzul}
+            style={estilos.botaoAzul}
             activeOpacity={0.85}
             onPress={() => {
-              if (!fluxoFinalizado) setModalVisivel(true);
+              if (fluxoFinalizado) {
+                irParaMeusAgendamentos();
+                return;
+              }
+              abrirConfirmacao();
             }}
           >
             <Text style={estilos.botaoTxtBranco}>
-              {fluxoFinalizado ? 'Cancelar' : 'Confirma Serviços'}
+              {fluxoFinalizado ? 'Concluído' : 'Confirmar Serviços'}
             </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
 
-      <Modal visible={modalVisivel} transparent animationType="fade">
+      <Modal
+        visible={modalVisivel}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalVisivel(false)}
+      >
         <Pressable style={estilos.modalFundo} onPress={() => setModalVisivel(false)}>
           <Pressable style={estilos.modalCard} onPress={(e) => e.stopPropagation()}>
             <View style={estilos.modalIconeWrap}>
@@ -158,7 +282,7 @@ export function TelaResumoServico({ route }: Props) {
               </View>
             </View>
             <Text style={estilos.modalTitulo}>Solicitação confirmada!</Text>
-            <Text style={estilos.modalSub}>Seu Serviço foi confirmado com sucesso</Text>
+            <Text style={estilos.modalSub}>Seu serviço foi confirmado com sucesso</Text>
             <TouchableOpacity
               onPress={() => {
                 setModalVisivel(false);
@@ -182,11 +306,21 @@ const estilos = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     minHeight: 56,
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     backgroundColor: tema.fundoBranco,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(0,0,0,0.06)',
+  },
+  btnVoltar: { width: 40, justifyContent: 'center' },
+  tituloHeader: {
+    flex: 1,
+    minWidth: 0,
+    textAlign: 'center',
+    fontSize: 17,
+    fontWeight: '700',
+    color: tema.texto,
+    marginHorizontal: 4,
   },
   local: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 },
   localTexto: { fontWeight: '600', color: tema.texto, fontSize: 16 },
@@ -285,6 +419,21 @@ const estilos = StyleSheet.create({
     marginBottom: 16,
     alignSelf: 'stretch',
   },
+  secaoServ: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: tema.texto,
+    marginBottom: 8,
+  },
+  linhaServ: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 8,
+  },
+  nomeServ: { flex: 1, flexShrink: 1, minWidth: 0, fontSize: 14, color: '#414754' },
+  precoServ: { fontSize: 14, fontWeight: '600', color: tema.texto },
   linhaValor: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -345,6 +494,7 @@ const estilos = StyleSheet.create({
     lineHeight: 20,
     fontWeight: '600',
     color: tema.texto,
+    flexShrink: 1,
   },
   infoSec: {
     fontSize: 14,
@@ -369,7 +519,7 @@ const estilos = StyleSheet.create({
   },
   botaoVermelho: {
     marginTop: 18,
-    backgroundColor: VERMELHO,
+    backgroundColor: '#C62828',
     borderRadius: 8,
     paddingVertical: 16,
     minHeight: 52,
@@ -380,6 +530,7 @@ const estilos = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 6,
     elevation: 4,
+    opacity: 0.85,
   },
   botaoTxtBranco: { color: '#fff', fontSize: 17, fontWeight: '700' },
   modalFundo: {
