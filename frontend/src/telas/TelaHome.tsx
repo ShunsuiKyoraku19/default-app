@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Image,
   Platform,
@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
@@ -21,6 +21,8 @@ import type { ComponentProps } from 'react';
 import type { ImageSourcePropType } from 'react-native';
 import { tema } from '../estilos/tema';
 import { useAutenticacao } from '../contexto/ContextoAutenticacao';
+import { listarLojasOrdenadasPorDistancia, rotuloCategoriaParaChave } from '../constantes/lojasFicticias';
+import { obterResumoAvaliacaoLoja } from '../servicos/avaliacoesResumoLoja';
 import type { PilhaInicioParametros, RotasAbas } from '../navegacao/tiposNavegacao';
 
 const AZUL_FIGMA = '#1E6FD9';
@@ -44,51 +46,71 @@ const CATEGORIAS: {
   { rotulo: 'S.O.S', imagem: require('../../assets/categoria-sos.png'), vermelho: true },
 ];
 
-const OFICINAS: {
-  nome: string;
-  nota: string;
-  servico: string;
-  tempo: string;
-  dist: string;
-  thumb: ImageSourcePropType;
-}[] = [
-  {
-    nome: 'Mecânica Seu Zé',
-    nota: '4.8',
-    servico: 'Mecânica Geral',
-    tempo: '30-45 min',
-    dist: '1.5 km',
-    thumb: require('../../assets/images/oficina-seu-ze.jpg'),
-  },
-  {
-    nome: 'Peças Premium',
-    nota: '4.9',
-    servico: 'Importados',
-    tempo: '45-60 min',
-    dist: '2.2 km',
-    thumb: require('../../assets/images/oficina-pecas-premium.jpg'),
-  },
-];
+const OFICINAS = listarLojasOrdenadasPorDistancia();
 
-const GRID_GAP = 15;
-const BOX_ALVO = 70;
+const GRID_COLUNAS = 4;
+const BOX_ALVO = 56;
+const GAP_LINHA_ALVO = 16;
+const MARGEM_GRID = 20;
+const GAP_ICONE_TEXTO = 7.75;
+const AZUL_ICONE_CAT = '#005AB3';
+const VERMELHO_SOS = '#BA1A1A';
 
 type NavInicio = NativeStackNavigationProp<PilhaInicioParametros>;
 
 export function TelaHome() {
   const navigation = useNavigation<NavInicio>();
   const { usuario } = useAutenticacao();
+  const [notaPorLoja, setNotaPorLoja] = useState<Record<string, string>>({});
 
-  function irParaDetalhesOficina(nome: string) {
+  useFocusEffect(
+    useCallback(() => {
+      let ativo = true;
+      void Promise.all(
+        OFICINAS.map(async (o) => {
+          const r = await obterResumoAvaliacaoLoja(o.id);
+          return [o.id, r.mediaTexto] as const;
+        })
+      ).then((pares) => {
+        if (!ativo) return;
+        const m: Record<string, string> = {};
+        for (const [id, t] of pares) m[id] = t;
+        setNotaPorLoja(m);
+      });
+      return () => {
+        ativo = false;
+      };
+    }, [])
+  );
+
+  function irParaDetalhesOficina(lojaId: string) {
     const tabNav = navigation.getParent<BottomTabNavigationProp<RotasAbas>>();
     if (tabNav != null) {
       tabNav.navigate('Inicio', {
         screen: 'DetalhesOficina',
-        params: { nome },
+        params: { lojaId },
       });
       return;
     }
-    navigation.navigate('DetalhesOficina', { nome });
+    navigation.navigate('DetalhesOficina', { lojaId });
+  }
+
+  function aoPressionarCategoria(rotulo: string) {
+    if (rotulo === 'S.O.S') {
+      navigation.navigate('AjudaSos');
+      return;
+    }
+    const categoria = rotuloCategoriaParaChave(rotulo);
+    if (categoria == null) return;
+    const tabNav = navigation.getParent<BottomTabNavigationProp<RotasAbas>>();
+    if (tabNav != null) {
+      tabNav.navigate('Inicio', {
+        screen: 'ListaLojasCategoria',
+        params: { categoria },
+      });
+      return;
+    }
+    navigation.navigate('ListaLojasCategoria', { categoria });
   }
   const alturaBarraAbas = useBottomTabBarHeight();
   const inicial = usuario?.nome?.charAt(0)?.toUpperCase() ?? '?';
@@ -101,18 +123,15 @@ export function TelaHome() {
     return 'Ceilândia, Brasília';
   }, [usuario?.cidadeNome, usuario?.ufSigla]);
 
-  const { larguraGrid, tamanhoBox, iconeCat } = useMemo(() => {
-    const margens = 40;
-    const maxLinha = larguraTela - margens;
-    const natural = 4 * BOX_ALVO + 3 * GRID_GAP;
-    if (maxLinha >= natural) {
-      return { larguraGrid: natural, tamanhoBox: BOX_ALVO, iconeCat: 26 };
-    }
-    const box = Math.floor((maxLinha - 3 * GRID_GAP) / 4);
+  const { larguraColuna, tamanhoBox, rowGap, iconeCat } = useMemo(() => {
+    const larguraGrid = larguraTela - MARGEM_GRID * 2;
+    const larguraColuna = larguraGrid / GRID_COLUNAS;
+    const tamanhoBox = Math.max(48, Math.min(BOX_ALVO, Math.floor(larguraColuna - 4)));
     return {
-      larguraGrid: maxLinha,
-      tamanhoBox: Math.max(52, box),
-      iconeCat: Math.round(Math.min(26, box * 0.38)),
+      larguraColuna,
+      tamanhoBox,
+      rowGap: GAP_LINHA_ALVO,
+      iconeCat: Math.round(Math.min(22, tamanhoBox * 0.39)),
     };
   }, [larguraTela]);
 
@@ -144,43 +163,38 @@ export function TelaHome() {
         </View>
 
         <View style={estilos.gridWrap}>
-          <View style={[estilos.grid, { width: larguraGrid, columnGap: GRID_GAP, rowGap: GRID_GAP }]}>
+          <View style={[estilos.grid, { rowGap }]}>
             {CATEGORIAS.map((c) => (
-              <View key={c.rotulo} style={[estilos.celula, { width: tamanhoBox }]}>
-                <View
+              <View key={c.rotulo} style={[estilos.celula, { width: larguraColuna }]}>
+                <TouchableOpacity
+                  activeOpacity={0.75}
+                  onPress={() => aoPressionarCategoria(c.rotulo)}
                   style={[
-                    estilos.iconeBox,
-                    { width: tamanhoBox, height: tamanhoBox, borderRadius: 12 },
-                    c.vermelho && estilos.iconeBoxSos,
+                    c.vermelho ? estilos.iconeBoxSos : estilos.iconeBox,
+                    { width: tamanhoBox, height: tamanhoBox },
                   ]}
                 >
                   {c.imagem != null ? (
                     <Image
                       source={c.imagem}
                       style={{
-                        width: Math.round(
-                          iconeCat * (c.rotulo === 'S.O.S' ? 1.05 : 1.2),
-                        ),
-                        height: Math.round(
-                          iconeCat * (c.rotulo === 'S.O.S' ? 1.05 : 1.2),
-                        ),
+                        width: Math.round(iconeCat * (c.rotulo === 'S.O.S' ? 1.05 : 1.15)),
+                        height: Math.round(iconeCat * (c.rotulo === 'S.O.S' ? 1.05 : 1.15)),
                       }}
                       resizeMode="contain"
                     />
                   ) : (
                     <MaterialCommunityIcons
                       name={c.icone!}
-                      size={c.vermelho ? Math.min(28, iconeCat + 2) : iconeCat}
-                      color={c.vermelho ? '#E53935' : AZUL_FIGMA}
+                      size={iconeCat}
+                      color={c.vermelho ? VERMELHO_SOS : AZUL_ICONE_CAT}
                     />
                   )}
-                </View>
+                </TouchableOpacity>
                 <Text
                   style={[estilos.celulaTexto, c.vermelho && estilos.celulaTextoSos]}
                   numberOfLines={1}
                   ellipsizeMode="tail"
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.72}
                   {...(Platform.OS === 'android' ? { textBreakStrategy: 'simple' as const } : {})}
                 >
                   {c.rotulo}
@@ -215,33 +229,33 @@ export function TelaHome() {
 
         {OFICINAS.map((o) => (
           <TouchableOpacity
-            key={o.nome}
+            key={o.id}
             style={estilos.cardOficina}
             activeOpacity={0.75}
-            onPress={() => irParaDetalhesOficina(o.nome)}
+            onPress={() => irParaDetalhesOficina(o.id)}
           >
-            <Image source={o.thumb} style={estilos.cardImg} resizeMode="cover" />
+            <Image source={o.imagemCard} style={estilos.cardImg} resizeMode="cover" />
             <View style={estilos.cardCorpo}>
               <Text style={estilos.cardNome} numberOfLines={1}>
                 {o.nome}
               </Text>
               <View style={estilos.linhaNota}>
-                <MaterialCommunityIcons name="star" size={14} color="#FBBF24" />
-                <Text style={estilos.nota}>{o.nota}</Text>
+                <MaterialCommunityIcons name="star" size={14} color={AZUL_FIGMA} />
+                <Text style={estilos.nota}>{notaPorLoja[o.id] ?? o.nota}</Text>
                 <Text style={estilos.servico} numberOfLines={1}>
-                  {o.servico}
+                  {o.categoriaPrincipal}
                 </Text>
               </View>
               <View style={estilos.linhaInfo}>
                 <MaterialCommunityIcons name="clock-outline" size={13} color="#757575" />
-                <Text style={estilos.info}>{o.tempo}</Text>
+                <Text style={estilos.info}>{o.tempoEstimado}</Text>
                 <MaterialCommunityIcons
                   name="map-marker-distance"
                   size={13}
                   color="#757575"
                   style={estilos.infoIconeDist}
                 />
-                <Text style={estilos.info}>{o.dist}</Text>
+                <Text style={estilos.info}>{o.distanciaTexto}</Text>
               </View>
             </View>
           </TouchableOpacity>
@@ -289,47 +303,55 @@ const estilos = StyleSheet.create({
   },
   buscaInput: { flex: 1, fontSize: 13, fontWeight: '500', color: tema.texto, paddingVertical: 0 },
   gridWrap: {
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 18,
+    paddingHorizontal: MARGEM_GRID,
+    paddingTop: 20,
+    paddingBottom: 20,
+    marginBottom: 0,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'flex-start',
+    width: '100%',
+    justifyContent: 'space-between',
   },
   celula: {
     alignItems: 'center',
+    gap: GAP_ICONE_TEXTO,
   },
   iconeBox: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: tema.fundoBranco,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   iconeBoxSos: {
-    backgroundColor: '#FFEAEA',
-    borderWidth: 1,
-    borderColor: '#FFCDD2',
-    shadowOpacity: 0.06,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 218, 214, 0.30)',
+    borderRadius: 16,
+    borderWidth: 0,
+    overflow: 'hidden',
+    elevation: 0,
+    shadowOpacity: 0,
+    shadowRadius: 0,
   },
   celulaTexto: {
-    marginTop: 6,
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 10,
+    lineHeight: 12.5,
+    fontWeight: '600',
     textAlign: 'center',
-    color: tema.texto,
-    letterSpacing: -0.35,
+    color: '#1B1B1D',
+    textTransform: 'uppercase',
     maxWidth: '100%',
     alignSelf: 'stretch',
   },
   celulaTextoSos: {
-    color: '#E53935',
-    fontWeight: '700',
+    color: VERMELHO_SOS,
   },
   bannerCard: {
     flexDirection: 'row',

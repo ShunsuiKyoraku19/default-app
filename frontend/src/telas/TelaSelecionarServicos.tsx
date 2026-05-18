@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -9,15 +9,20 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { obterLojaPorId } from '../constantes/lojasFicticias';
 import {
-  cabecalhoSelecionarServicos,
-  listaServicosParaAgendar,
+  cabecalhoSelecionarPorLojaId,
+  formatBRL,
+  listaServicosParaAgendarPorLojaId,
 } from '../constantes/servicosAgendamento';
+import { obterResumoAvaliacaoLoja } from '../servicos/avaliacoesResumoLoja';
+import { construirProximosDiasUteis } from '../util/agendaDias';
 import { useAutenticacao } from '../contexto/ContextoAutenticacao';
 import { tema } from '../estilos/tema';
 import type { PilhaInicioParametros } from '../navegacao/tiposNavegacao';
@@ -26,61 +31,52 @@ type Props = NativeStackScreenProps<PilhaInicioParametros, 'SelecionarServicos'>
 
 const AZUL = '#2563EB';
 
-const HORARIOS_AGENDA = ['08:00', '09:30', '11:00', '14:00', '15:30', '17:00'] as const;
-
-const ROTULOS_DIA = ['SEG', 'TER', 'QUA', 'QUI', 'SEX'] as const;
-
-type DiaAgenda = { id: string; rotulo: string; dia: number };
-
-function inicioSegundaDaSemana(ref: Date): Date {
-  const d = new Date(ref);
-  d.setHours(12, 0, 0, 0);
-  const dow = d.getDay();
-  const mon = new Date(d);
-  if (dow === 0) mon.setDate(d.getDate() + 1);
-  else if (dow === 6) mon.setDate(d.getDate() + 2);
-  else mon.setDate(d.getDate() - (dow - 1));
-  return mon;
-}
-
-function construirDiasUteis(): DiaAgenda[] {
-  const mon = inicioSegundaDaSemana(new Date());
-  const fimSemana = new Date(mon);
-  fimSemana.setDate(mon.getDate() + 4);
-  fimSemana.setHours(23, 59, 59, 999);
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  let inicio = new Date(mon);
-  if (fimSemana < hoje) {
-    inicio.setDate(mon.getDate() + 7);
-  }
-  return ROTULOS_DIA.map((rotulo, i) => {
-    const data = new Date(inicio);
-    data.setDate(inicio.getDate() + i);
-    return {
-      id: `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}-${String(data.getDate()).padStart(2, '0')}`,
-      rotulo,
-      dia: data.getDate(),
-    };
-  });
-}
-
 export function TelaSelecionarServicos({ navigation, route }: Props) {
-  const { nome } = route.params;
+  const { lojaId } = route.params;
   const { usuario } = useAutenticacao();
   const inicial = usuario?.nome?.charAt(0)?.toUpperCase() ?? '?';
   const alturaBarraAbas = useBottomTabBarHeight();
 
-  const servicos = useMemo(() => listaServicosParaAgendar(nome), [nome]);
-  const info = useMemo(() => cabecalhoSelecionarServicos(nome), [nome]);
-  const diasAgenda = useMemo(() => construirDiasUteis(), []);
-  const [indiceDiaAgenda, setIndiceDiaAgenda] = useState(1);
-  const [horarioAgenda, setHorarioAgenda] = useState<string>('09:30');
+  const loja = useMemo(() => obterLojaPorId(lojaId), [lojaId]);
+  const nome = loja?.nome ?? 'Oficina';
+
+  const servicos = useMemo(() => listaServicosParaAgendarPorLojaId(lojaId), [lojaId]);
+  const info = useMemo(() => cabecalhoSelecionarPorLojaId(lojaId), [lojaId]);
+  const [notaResumo, setNotaResumo] = useState(info.nota);
+
+  useFocusEffect(
+    useCallback(() => {
+      let ativo = true;
+      void obterResumoAvaliacaoLoja(lojaId).then((r) => {
+        if (ativo) setNotaResumo(r.mediaTexto);
+      });
+      return () => {
+        ativo = false;
+      };
+    }, [lojaId])
+  );
+
+  useEffect(() => {
+    setNotaResumo(info.nota);
+  }, [lojaId, info.nota]);
+  const diasAgenda = useMemo(
+    () => construirProximosDiasUteis(loja?.diasSemanaDisponiveis ?? [1, 2, 3, 4, 5], 6),
+    [loja?.diasSemanaDisponiveis]
+  );
+  const horariosLoja = loja?.horariosDisponiveis ?? ['09:00', '14:00'];
+  const [indiceDiaAgenda, setIndiceDiaAgenda] = useState(0);
+  const [horarioAgenda, setHorarioAgenda] = useState<string>(horariosLoja[0] ?? '09:00');
 
   const [selecionados, setSelecionados] = useState<Set<string>>(() => new Set());
   const temSelecao = selecionados.size > 0;
   const [barraMontada, setBarraMontada] = useState(false);
   const progressoBarra = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const h0 = loja?.horariosDisponiveis?.[0] ?? '09:00';
+    setHorarioAgenda(h0);
+    setIndiceDiaAgenda(0);
+  }, [lojaId, loja?.horariosDisponiveis]);
 
   useEffect(() => {
     if (temSelecao) setBarraMontada(true);
@@ -119,13 +115,23 @@ export function TelaSelecionarServicos({ navigation, route }: Props) {
 
   function confirmar() {
     if (selecionados.size === 0) return;
-    navigation.navigate('ResumoServico', { nome });
+    const dia = diasAgenda[indiceDiaAgenda];
+    if (dia == null) return;
+    navigation.navigate('ResumoServico', {
+      lojaId,
+      idsServicos: Array.from(selecionados),
+      dataIso: dia.id,
+      horario: horarioAgenda,
+    });
   }
 
   const resumoBarra = useMemo(() => {
-    const primeiro = servicos.find((s) => selecionados.has(s.id));
-    if (!primeiro) return null;
-    return { titulo: primeiro.titulo, preco: primeiro.preco };
+    const escolhidos = servicos.filter((s) => selecionados.has(s.id));
+    if (escolhidos.length === 0) return null;
+    const total = escolhidos.reduce((acc, s) => acc + s.precoReais, 0);
+    const titulo =
+      escolhidos.length === 1 ? escolhidos[0]!.titulo : `${escolhidos.length} serviços`;
+    return { titulo, preco: formatBRL(total) };
   }, [servicos, selecionados]);
 
   const margemInferiorBarra = Math.max(0, alturaBarraAbas - 22);
@@ -184,8 +190,8 @@ export function TelaSelecionarServicos({ navigation, route }: Props) {
         <View style={estilos.corpo}>
           <Text style={estilos.nomeGrande}>{nome}</Text>
           <View style={estilos.linhaInfo}>
-            <MaterialCommunityIcons name="star" size={16} color="#FBBF24" />
-            <Text style={estilos.infoTexto}>{info.nota}</Text>
+            <MaterialCommunityIcons name="star" size={16} color={AZUL} />
+            <Text style={estilos.infoTexto}>{notaResumo}</Text>
             <Text style={estilos.sep}>·</Text>
             <Ionicons name="location-outline" size={15} color={AZUL} />
             <Text style={estilos.infoTexto}>{info.distancia}</Text>
@@ -272,7 +278,7 @@ export function TelaSelecionarServicos({ navigation, route }: Props) {
             </ScrollView>
 
             <View style={estilos.horasGrid}>
-              {HORARIOS_AGENDA.map((h) => {
+              {horariosLoja.map((h) => {
                 const sel = h === horarioAgenda;
                 return (
                   <Pressable

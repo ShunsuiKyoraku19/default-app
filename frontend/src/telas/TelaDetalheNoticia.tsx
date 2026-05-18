@@ -1,21 +1,58 @@
 import React, { useCallback, useState } from 'react';
 import {
   Image,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useFocusEffect } from '@react-navigation/native';
-import { CabecalhoFluxo } from '../componentes/CabecalhoFluxo';
+import { Ionicons } from '@expo/vector-icons';
+import { useAutenticacao } from '../contexto/ContextoAutenticacao';
 import { tema } from '../estilos/tema';
 import type { PropsTelaDetalhe } from '../navegacao/tiposNavegacao';
 import { buscarNoticiaPorId } from '../servicos/noticiaServico';
 import type { Noticia } from '../tipos/noticia';
 
+function HeaderDetalheNoticia({
+  onVoltar,
+  inicial,
+}: {
+  onVoltar: () => void;
+  inicial: string;
+}) {
+  return (
+    <View style={estilos.header}>
+      <Pressable
+        onPress={onVoltar}
+        hitSlop={12}
+        style={estilos.btnVoltar}
+        accessibilityRole="button"
+        accessibilityLabel="Voltar"
+      >
+        <Ionicons name="chevron-back" size={26} color={tema.azulPrimario} />
+      </Pressable>
+      <Text style={estilos.tituloHeader} numberOfLines={1}>
+        Notícia
+      </Text>
+      <View style={estilos.avatar}>
+        <Text style={estilos.avatarLetra}>{inicial}</Text>
+      </View>
+    </View>
+  );
+}
+
 export function TelaDetalheNoticia({ navigation, route }: PropsTelaDetalhe) {
   const { idNoticia } = route.params;
+  const { usuario } = useAutenticacao();
+  const inicial = usuario?.nome?.charAt(0)?.toUpperCase() ?? '?';
+  const alturaBarraAbas = useBottomTabBarHeight();
   const [noticia, setNoticia] = useState<Noticia | null>(null);
+
+  const voltar = useCallback(() => navigation.goBack(), [navigation]);
 
   useFocusEffect(
     useCallback(() => {
@@ -32,17 +69,20 @@ export function TelaDetalheNoticia({ navigation, route }: PropsTelaDetalhe) {
 
   if (!noticia) {
     return (
-      <View style={estilos.safe}>
-        <CabecalhoFluxo titulo="Notícia" aoVoltar={() => navigation.goBack()} />
+      <SafeAreaView style={estilos.safe} edges={['top']}>
+        <HeaderDetalheNoticia onVoltar={voltar} inicial={inicial} />
         <Text style={estilos.carregando}>Carregando...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={estilos.safe}>
-      <CabecalhoFluxo titulo="Notícia" aoVoltar={() => navigation.goBack()} />
-      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
+    <SafeAreaView style={estilos.safe} edges={['top']}>
+      <HeaderDetalheNoticia onVoltar={voltar} inicial={inicial} />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: alturaBarraAbas + 28 }}
+      >
         {noticia.imagem ? (
           <Image source={{ uri: noticia.imagem }} style={estilos.hero} />
         ) : null}
@@ -58,12 +98,40 @@ export function TelaDetalheNoticia({ navigation, route }: PropsTelaDetalhe) {
           <Text style={estilos.conteudo}>{noticia.conteudo}</Text>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const estilos = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: tema.fundo },
+  safe: { flex: 1, backgroundColor: tema.fundoBranco },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    minHeight: 52,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0,0,0,0.06)',
+    backgroundColor: tema.fundoBranco,
+  },
+  btnVoltar: { width: 40, justifyContent: 'center' },
+  tituloHeader: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 17,
+    fontWeight: '700',
+    color: tema.texto,
+    marginHorizontal: 4,
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: tema.azulClaro,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarLetra: { fontWeight: '700', color: tema.azulEscuro, fontSize: 14 },
   carregando: { textAlign: 'center', marginTop: 40, color: tema.textoSecundario },
   hero: { width: '100%', height: 220 },
   corpo: { padding: 20 },
